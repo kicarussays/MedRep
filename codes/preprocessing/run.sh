@@ -1,8 +1,7 @@
 #!/bin/bash
 NUM_CPUS=64
 SEQ_LENGTH=2048
-# hospitals=("snuh")
-hospitals=("mimic" "ehrshot" "snuh")
+hospitals=("mimic" "ehrshot")
 
 for HOSPITAL in "${hospitals[@]}"; do
     python preprocessing/create_trajectory.py --num_cpus $NUM_CPUS --hospital $HOSPITAL
