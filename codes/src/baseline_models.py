@@ -780,7 +780,7 @@ class EthosForSequenceClassification(BertForSequenceClassification):
                 ln_f=LayerNorm(config.hidden_size, bias=config.bias),
             )
         )
-        self.lm_head = nn.Linear(config.hidden_size, 2, bias=False)
+        self.lm_head_for_clf = nn.Linear(config.hidden_size, 2, bias=False)
         # if we are using adaptive softmax, we need to also create the head for the tail of the distribution
 
         # init all weights
@@ -828,7 +828,7 @@ class EthosForSequenceClassification(BertForSequenceClassification):
         # Get hidden state of last code
         x = self.transformer.ln_f(x) 
         x = x[:, -1, :] # [batch_size * 2]
-        logits = self.lm_head(x)
+        logits = self.lm_head_for_clf(x)
 
         loss = None
         if target is not None:

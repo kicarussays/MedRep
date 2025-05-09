@@ -174,13 +174,18 @@ def main():
         model = RNNForSequenceClassification(bertconfig, args.model)
     elif args.model in ('behrt', 'medbert', 'behrt-de'):
         model = EHRBertForSequenceClassification(bertconfig)
-        load_pretrained = torch.load(os.path.join(ppath, f'{args.model}+{pretrained_param}.tar'),
-                                    map_location=device)
-        model.load_state_dict(load_pretrained['model'], strict=False)
     elif args.model in ('ethos', ):
         model = EthosForSequenceClassification(bertconfig)
+    
+    if args.model in ('behrt', 'medbert', 'behrt-de', 'ethos'):
         load_pretrained = torch.load(os.path.join(ppath, f'{args.model}+{pretrained_param}.tar'),
                                     map_location=device)
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in load_pretrained['model'].items():
+            name = k.replace("module.", "")
+            if 'concept_embeddings' not in name:
+                new_state_dict[name] = v
         model.load_state_dict(load_pretrained['model'], strict=False)
 
     if args.rep_type != 'none':
