@@ -1,7 +1,6 @@
 # MedRep
 
 The official source code for MedRep. <br>
-Paper Link: https://arxiv.org/abs/2504.08329
 
   <br/>
 
