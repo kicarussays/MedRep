@@ -5,7 +5,7 @@ The official source code for MedRep. <br>
   <br/>
 
 **Notes** <br/>
-(April 24, 2025) We have now released the full version of OMOP concept representations. Download the files [here](https://dl.dropboxusercontent.com/scl/fi/hrahyu4pbilg00vvymvn3/concept_representation_v2.0.zip?rlkey=7qgpw5ibxlspqyb8xtn8850lb&st=cdx7siyb). 
+(April 24, 2025) We have now released the full version of OMOP concept representations. Download the files [here](https://dl.dropboxusercontent.com/scl/fi/0ibwsonuuidxhkth45agx/medrep.zip?rlkey=2u3ht6j6dzkium2vo9rt0dr1o&st=9qypj5lu). 
 
   <br/>
   
