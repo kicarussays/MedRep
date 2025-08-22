@@ -37,7 +37,7 @@ class DotDict(dict):
         return value
 
 
-def featurization(records, OUTCOME=None):
+def featurization(records, gender_info, OUTCOME=None):
     use_id = 'divided_person_id' if OUTCOME is None else 'person_id'
     use_cols = ['concept_id', 'domain', 'age', 'visit_rank', 'record_rank']
 
@@ -51,17 +51,17 @@ def featurization(records, OUTCOME=None):
         'segment': [],
         'record_rank': [],
     }
-    for i in tqdm(_features):
-        features['concept'].append(i[:, 0].tolist())
-        features['domain'].append(i[:, 1].astype(int).tolist())
-        features['age'].append(i[:, 2].astype(int).tolist())
-        features['segment'].append(i[:, 3].astype(int).tolist())
-        features['record_rank'].append(i[:, 4].astype(int).tolist())
+    for n, i in tqdm(enumerate(_features)):
+        features['concept'].append([gender_info[n]] + i[:, 0].tolist())
+        features['domain'].append([0] + i[:, 1].astype(int).tolist())
+        features['age'].append([i[0, 2]] + i[:, 2].astype(int).tolist())
+        features['segment'].append([0] + i[:, 3].astype(int).tolist())
+        features['record_rank'].append([0] + i[:, 4].astype(int).tolist())
 
     if OUTCOME is None:
         return features
     else:
-        label = list(records.groupby([use_id]).apply(lambda x: list(set(x['label']))[0]).astype(int))
+        label = list(records.groupby([use_id]).apply(lambda x: list(x['label'])[0]))
         return features, label
 
 
@@ -80,3 +80,15 @@ def pred_calculation(y, y_hat):
     best_thresh = thresholds[ix] 
     y_pred = (y_hat >= best_thresh).astype(bool)
     return y_pred
+
+
+def finish_check(path):
+    f = open(path, 'r')
+    lines = f.readlines()
+    flag = False
+    for line in lines:
+        line = line.strip()  
+        if 'Early stopping activated' in line or 'Epoch [100/100]' in line:
+            flag = True
+            break
+    return flag

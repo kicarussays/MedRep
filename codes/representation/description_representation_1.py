@@ -79,6 +79,7 @@ def main():
     if hasattr(model.deberta.encoder, "rel_embeddings"):
         model.deberta.encoder.rel_embeddings = torch.nn.Embedding(
             2048, model.config.hidden_size)
+    model = model.to('cuda:0')
     print('Done')
 
     # Load tokenized description data
@@ -118,7 +119,7 @@ def train(
     args = args
     device = f'cuda:{gpu}'
     ngpus_per_node = torch.cuda.device_count()    
-    print("Use GPU: {} for training".format(gpu))
+    print("Use GPU: {} / {} for training".format(gpu, ngpus_per_node))
 
     args.rank = args.rank * ngpus_per_node + gpu    
     dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
@@ -136,6 +137,7 @@ def train(
 
 
     args.bs = int(args.bs / ngpus_per_node)
+    model = model.to(device)
     model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[gpu], find_unused_parameters=True)
     optimizer = AdamW(

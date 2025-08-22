@@ -1,8 +1,8 @@
-batch_size: 2048
+batch_size: 1024
 learning_rate: 0.0005
 num_hidden: 768
 num_proj_hidden: 768
-activation: 'relu'
+activation: 'prelu'
 base_model: 'GCNConv'
 num_layers: 2
 drop_edge_rate_1: 0.2

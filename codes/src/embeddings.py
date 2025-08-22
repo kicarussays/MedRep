@@ -31,7 +31,6 @@ class EhrEmbeddings(nn.Module):
 
         self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.representaiton_embeddings = nn.Linear(config.hidden_size, config.hidden_size)
 
         if self.config.to_dict().get('linear', False):
             self.a = nn.Parameter(torch.ones(1))
@@ -55,10 +54,8 @@ class EhrEmbeddings(nn.Module):
         if inputs_embeds is not None:
             return inputs_embeds
 
-        if self.config.rep_type in ('none', 'ethos'):
-            embeddings = self.a * self.concept_embeddings(input_ids)
-        else:
-            embeddings = self.a * self.representaiton_embeddings(self.concept_embeddings(input_ids))
+        embeddings = self.a * self.concept_embeddings(input_ids)
+        
         if age_ids is not None:
             ages_embedded = self.age_embeddings(age_ids)
             embeddings += self.b * ages_embedded

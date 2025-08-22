@@ -126,14 +126,18 @@ class BinaryOutcomeDataset(BaseDataset):
         features: dict, 
         outcomes: torch.tensor, 
         vocabulary: dict, 
-        neighbors_mapped, 
+        neighbors_mapped,
         aug_times,
+        aug_ratio,
+        limit_aug=None,
         drop=False,
         **kwargs
     ):
         super().__init__(features, **kwargs)
+        super().__init__(features, **kwargs)
         self.outcomes = outcomes
         self.vocabulary = vocabulary
+        self.limit_aug = limit_aug
         self.drop = drop
         
         if neighbors_mapped is not None:
@@ -142,11 +146,14 @@ class BinaryOutcomeDataset(BaseDataset):
         else:
             self.neighbors_mapped = neighbors_mapped
         self.aug_times = aug_times
+        self.aug_ratio = aug_ratio
 
     def __getitem__(self, index):
         patient = super().__getitem__(index)
         patient['target'] = self.outcomes[index]
         patient = self.convert_to_long(patient)
+        if self.limit_aug:
+            return patient
         if self.neighbors_mapped is not None and torch.rand(1) > 1 / self.aug_times:
             patient = self._augment(patient)
 
@@ -156,55 +163,14 @@ class BinaryOutcomeDataset(BaseDataset):
         concepts = patient['concept']
         augmented_concepts = torch.clone(concepts)
         rng = torch.rand(len(augmented_concepts))  
-        aug_ratio = 0.8 + 0.15 * torch.rand(1) # Between 0.8 and 0.95
 
-        augmented = rng < aug_ratio 
+        augmented = rng < self.aug_ratio + torch.rand(1)/5 - 0.1
         row_indices = torch.arange(augmented_concepts[augmented].shape[0])
         col_indices = torch.randint(0, self.num_augment, (augmented_concepts[augmented].shape[0],))
         selected_neighbors = self.neighbors_mapped[augmented_concepts[augmented]][row_indices, col_indices]
         augmented_concepts[augmented] = selected_neighbors
         patient['concept'] = augmented_concepts.type(torch.LongTensor)
         return patient
-
-    # def _drop(self, patient):
-    #     concepts = patient['concept']
-    #     drop_ratio = 0.8 * torch.rand(1) # Between 0.0 and 0.8
-    #     valid_concepts = concepts[concepts != 0][2:]
-    #     if len(valid_concepts) >= 50:
-    #         use_idx = torch.rand(len(valid_concepts)) > drop_ratio
-    #         use_concepts = torch.cat([concepts[:2], valid_concepts[use_idx]])
-    #         concepts = torch.cat([use_concepts, torch.zeros(len(concepts) - len(use_concepts))])
-    #     patient['concept'] = concepts.type(torch.LongTensor)
-    #     return patient
-
-
-class EthosDataset(BaseDataset):
-    def __init__(self, features: dict, timeline_len: int=2048):
-        self.features = features
-        self.timeline_len: int = timeline_len
-
-    def __len__(self) -> int:
-        return len(self.features['concept']) - self.timeline_len
-
-    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
-        patient_x = super().__getitem__(idx)
-        patient_y = super().__getitem__(idx)
-        for key, values in self.features.items():
-            patient_x[key] = values[idx:idx+self.timeline_len]
-        for key, values in self.features.items():
-            patient_y[key] = values[idx+1:idx+1+self.timeline_len]
-        patient_x = self.convert_to_long(patient_x)
-        patient_y = self.convert_to_long(patient_y)
-        return patient_x, patient_y
-        
-    def convert_to_long(self, patient):
-        """
-        Converts all tensors in the patient to longs except abspos
-        """
-        _patient = {}
-        for k, v in patient.items():
-            _patient[k] = v.long()
-        return _patient
 
 
 class InferenceDataset(torch.utils.data.Dataset):

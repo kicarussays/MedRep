@@ -26,11 +26,6 @@ from medtok.tokenizer import MultimodalTokenizer
 from medtok.loss import shared_loss, specific_loss
 
 
-class makeargs:
-    num_cpus = 80
-    rep_type = 'description'
-
-args = makeargs
 
 abspath = str(Path(__file__).resolve().parent.parent.parent)
 cpath = os.path.join(abspath, 'data/concepts')
@@ -44,60 +39,82 @@ os.makedirs(os.path.join(abspath, f'results/gnn/saved/'), exist_ok=True)
 
 
 def main(args):
-    device = 'cuda:1'
-    desc = np.load(os.path.join(rpath, 'concept_representation_description.npy'))
 
-    ray.init(num_cpus=args.num_cpus)
-    relationships = mpd.read_csv(os.path.join(cpath,'CONCEPT_RELATIONSHIP.csv'), delimiter='\t')
-    concepts = mpd.read_csv(os.path.join(cpath_tmp, "all_descriptions.csv"))
 
-    # Get concept IDs
-    use_cid = concepts['concept_id'].apply(lambda x: int(str(x).split('_')[0])).unique()
+    abspath = str(Path(__file__).resolve().parent.parent.parent)
+    cpath = os.path.join(abspath, 'data/concepts')
+    cpath_tmp = os.path.join(abspath, 'usedata/descriptions')
+    rpath = os.path.join(abspath, 'usedata/representation')
+    config_path = os.path.join(abspath, 'codes/configs/')
+    logpath = os.path.join(abspath, f'results/gnn/logs/medrep.log')
+    savepath = os.path.join(abspath, f'results/gnn/saved/medrep.tar')
+    os.makedirs(os.path.join(abspath, f'results/gnn/logs/'), exist_ok=True)
+    os.makedirs(os.path.join(abspath, f'results/gnn/saved/'), exist_ok=True)
 
-    # Set graph edges
-    relationships = relationships[
-        (relationships['concept_id_1'].isin(use_cid)) & 
-        (relationships['concept_id_2'].isin(use_cid)) & 
-        (relationships['concept_id_1'] > relationships['concept_id_2'])
-    ]
-    relationships = relationships[['concept_id_1', 'concept_id_2']]
 
-    # Add edges of measurement deciles
-    measurement_ids = concepts[
-        concepts['concept_id'].apply(lambda x: len(str(x).split('_')) == 2)]
-    measurement_ids['concept_id_1'] = measurement_ids['concept_id'].apply(lambda x: int(str(x).split('_')[0]))
-    measurement_ids = measurement_ids[['concept_id_1', 'concept_id']]
-    measurement_ids.columns = ['concept_id_1', 'concept_id_2']
+    # Edge contruction
+    edge_path = os.path.join(rpath, 'edges.npy')
+    if not os.path.exists(edge_path):
+        ray.init(num_cpus=args.num_cpus)
+        relationships = mpd.read_csv(os.path.join(cpath,'CONCEPT_RELATIONSHIP.csv'), delimiter='\t')
+        concepts = mpd.read_csv(os.path.join(rpath, "concept_idx.csv"))
 
-    # Finalize edges 
-    relationships = mpd.concat([relationships, measurement_ids]).drop_duplicates()
-    relationships['concept_id_1'] = relationships['concept_id_1'].astype(str)
-    relationships['concept_id_2'] = relationships['concept_id_2'].astype(str)
+        # Get concept IDs
+        use_cid = concepts['concept_id'].values
 
-    # Set vocab (index for each concept ID)
-    concepts['concept_id'] = concepts['concept_id'].astype(str)
-    concepts = concepts.sample(frac=1) # shuffle
-    vocab = concepts.reset_index().set_index('concept_id')['index']
+        # Set graph edges
+        relationships = relationships[
+            (relationships['concept_id_1'].isin(use_cid)) & 
+            (relationships['concept_id_2'].isin(use_cid)) & 
+            (relationships['concept_id_1'] > relationships['concept_id_2'])
+        ]
+        relationships = relationships[['concept_id_1', 'concept_id_2']]
 
-    # Construct torch_geometric Data
-    edges = vocab.loc[relationships.values.reshape(-1)].values.reshape(-1, 2).T
+        # Add edges of measurement deciles
+        measurement_ids = concepts[
+            concepts['concept_id'].apply(lambda x: len(str(x).split('_')) == 2)]
+        measurement_ids['concept_id_1'] = measurement_ids['concept_id'].apply(lambda x: int(str(x).split('_')[0]))
+        measurement_ids = measurement_ids[['concept_id_1', 'concept_id']]
+        measurement_ids.columns = ['concept_id_1', 'concept_id_2']
 
+        # Finalize edges 
+        relationships = mpd.concat([relationships, measurement_ids]).drop_duplicates()
+        relationships['concept_id_1'] = relationships['concept_id_1'].astype(str)
+        relationships['concept_id_2'] = relationships['concept_id_2'].astype(str)
+
+        # Set vocab (index for each concept ID)
+        concepts['concept_id'] = concepts['concept_id'].astype(str)
+        vocab = concepts.reset_index().set_index('concept_id')['index']
+
+        # Construct torch_geometric Data
+        edges = vocab.loc[relationships.values.reshape(-1)].values.reshape(-1, 2).T
+        np.save(edge_path, edges)
+    else:
+        edges = np.load(edge_path)
+
+
+    # Training configs
+    device = f'cuda:{args.device}'
+    config_path = os.path.join(config_path, 'grace.yaml')
+    config = yaml.load(open(config_path), Loader=SafeLoader)
+
+    torch.manual_seed(config['seed'])
+    random.seed(config['seed'])
 
 
     # Graph Data construction
     representations = np.load(os.path.join(rpath, f'concept_representation_description.npy'))
-    features = torch.Tensor(representations).to(device)
-    edges = torch.Tensor(edges).type(torch.LongTensor).to(device)
-    graph_data = Data(x=features, edge_index=edges)
+    features = torch.Tensor(representations)
+    edges = torch.Tensor(edges).type(torch.LongTensor)
+    graph_data = Data(x=features.contiguous(), edge_index=edges.contiguous())
     train_loader = NeighborLoader(
         graph_data,  
         num_neighbors=[30, 20, 10],  
-        batch_size=2048, 
+        batch_size=config['batch_size'], 
         shuffle=True, 
         num_workers=4,
         pin_memory=True
     )
-
 
     vq_model = MultimodalTokenizer(
         graph_model_name='GCN',
@@ -131,8 +148,13 @@ def main(args):
     logger.info(f"no kmeans, args.lr = {args.lr}")
     optimizer = torch.optim.Adam(vq_model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2))
     args.vq_ckpt = savepath
+    if os.path.exists(savepath):
+        load_weight = torch.load(savepath, map_location=device, weights_only=False)
+        vq_model.load_state_dict(load_weight['model'])
+        optimizer.load_state_dict(load_weight['optimizer'])
+
     # Prepare models for training:
-    train_steps = 0
+    train_steps = load_weight['steps'] if os.path.exists(savepath) else 0 
     start_epoch = 0
     vq_model.train()
 
@@ -151,7 +173,11 @@ def main(args):
         
         logger.info(f"Beginning epoch {epoch}...")
         for inputs in tqdm(train_loader, total=len(train_loader), desc=f"Epoch {epoch}"):
+            inputs.x = inputs.x.to(device)
+            inputs.edge_index = inputs.edge_index.to(device)
             inputs.n_id = inputs.n_id.to(device)
+            inputs.e_id = inputs.e_id.to(device)
+            inputs.input_id = inputs.input_id.to(device)
 
             # generator training
             optimizer.zero_grad()
@@ -233,44 +259,48 @@ def main(args):
                     "args": args
                 }
                 
-                torch.save(checkpoint, savepath)
-                stop_flag = True
+                torch.save(checkpoint, savepath)    
+    
+                train_loader = NeighborLoader(
+                    graph_data,  
+                    num_neighbors=[30, 20, 10],  
+                    batch_size=2048, 
+                    shuffle=False, 
+                    num_workers=4,
+                    pin_memory=True
+                )
+                with torch.no_grad():
+                    vq_model.eval()
+                    all_reps = []
+                    for inputs in tqdm(train_loader): 
+                        inputs.x = inputs.x.to(device)
+                        inputs.edge_index = inputs.edge_index.to(device)
+                        inputs.n_id = inputs.n_id.to(device)
+                        inputs.e_id = inputs.e_id.to(device)
+                        inputs.input_id = inputs.input_id.to(device)
+                        quantized_result = vq_model(inputs)
+                        reps = torch.cat([
+                            quantized_result['specific_embedding_text'],
+                            quantized_result['specific_embedding_graph'],
+                            quantized_result['shared_text_embedding'],
+                            quantized_result['shared_graph_embedding'],
+                        ], dim=-1).cpu().detach()
+                        all_reps.append(reps)
+                    all_reps = torch.cat(all_reps)
+                
+                np.save(
+                    os.path.join(rpath, f'concept_representation_medtok_{train_steps}.npy'),
+                    all_reps.cpu().detach().numpy()
+                )
+                vq_model.train()
             if stop_flag: break
         if stop_flag: break
-    
-    
-    train_loader = NeighborLoader(
-        graph_data,  
-        num_neighbors=[30, 20, 10],  
-        batch_size=2048, 
-        shuffle=False, 
-        num_workers=4,
-        pin_memory=True
-    )
-    with torch.no_grad():
-        vq_model.eval()
-        all_reps = []
-        for i in tqdm(train_loader): 
-            i.n_id = i.n_id.to(device)
-            quantized_result = vq_model(i)
-            reps = torch.cat([
-                quantized_result['specific_embedding_text'],
-                quantized_result['specific_embedding_graph'],
-                quantized_result['shared_text_embedding'],
-                quantized_result['shared_graph_embedding'],
-            ], dim=-1)
-            all_reps.append(reps)
-        all_reps = torch.cat(all_reps)
-    
-    np.save(
-        os.path.join(rpath, f'concept_representation_medtok.npy'),
-        all_reps.cpu().detach().numpy()
-    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-path", type=str, default='datasets/')
+    parser.add_argument("--device", type=int, default=6)
 
     parser.add_argument("--kg-path", type=str, default='/n/netscratch/mzitnik_lab/Lab/xsu/primeKG/', help="path to the knowledge graph")
     parser.add_argument("--med-codes-pkg-map-path", type=str, default='/n/holylfs06/LABS/mzitnik_lab/Lab/shvat372/icml_paper/ICML_codes/graphs/all_codes_mappings_v3.parquet', help="path to the med codes package map")

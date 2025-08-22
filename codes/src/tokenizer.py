@@ -5,47 +5,6 @@ from os.path import join, split
 from tqdm import tqdm
 from transformers import BatchEncoding
 
-class EHRTokenizerForEthos():
-    def __init__(self, vocabulary=None, config=None):
-        self.frozen = False
-        self.config = config
-        if isinstance(vocabulary, type(None)):
-            self.vocabulary = {
-                '[PAD]':0,
-                '[MASK]':1,
-                '[UNK]':2,
-                '[CLS]':3,
-                '[SEP]':4,
-            }
-            
-        else:
-            self.vocabulary = vocabulary
-
-    def __call__(self, features):
-        return self.batch_encode(features)
-
-    def encode(self, concepts):
-        if not self.frozen:
-            for concept in concepts:
-                if concept not in self.vocabulary:
-                    self.vocabulary[concept] = len(self.vocabulary)
-                
-        return [self.vocabulary.get(concept, self.vocabulary['[UNK]']) for concept in tqdm(concepts)]
-
-    def batch_encode(self, features: dict):
-        data = {key: [] for key in features}
-        data['attention_mask'] = []
-
-        features['concept'] = self.encode(features['concept'])            # Encode concepts
-
-        for key, value in features.items():
-            data[key].append(value)
-            
-        return BatchEncoding(data, tensor_type='pt' if self.config.padding else None)
-
-    def freeze_vocabulary(self):
-        self.frozen = True
-
 
 class EHRTokenizer():
     def __init__(self, vocabulary=None, config=None):
@@ -76,17 +35,9 @@ class EHRTokenizer():
    
     @staticmethod
     def truncate(patient: dict, max_len: int):
-        # Find length of background sentence (2 to include CLS token and gender token)
-        # background_length = len([x for x in patient.get('concept', []) if x.startswith('BG_')]) + 2
-        background_length = 2
-        truncation_length = max_len - background_length
-        
-        # Do not start seq with SEP token (SEP token is included in background sentence)
-        if patient['concept'][-truncation_length] == '[SEP]':
-            truncation_length -= 1
 
         for key, value in patient.items():
-            patient[key] = value[:background_length] + value[:truncation_length]    # Keep background sentence + newest information
+            patient[key] = value[:max_len]    # Keep background sentence + newest information
 
         return patient
 
@@ -171,25 +122,3 @@ class EHRTokenizer():
         print(f"Writing vocab to {dest}")
         torch.save(self.vocabulary, dest)
 
-
-class EHRTokenizerForEthos():
-    def __init__(self, vocabulary=None):
-        self.vocabulary = vocabulary
-
-    def __call__(self, features):
-        return self.batch_encode(features)
-
-    def encode(self, concepts):
-        for concept in concepts:
-            if concept not in self.vocabulary:
-                self.vocabulary[concept] = len(self.vocabulary)
-                
-        return [self.vocabulary.get(concept, self.vocabulary['[UNK]']) for concept in tqdm(concepts)]
-
-    def batch_encode(self, features: dict):
-        features['concept'] = self.encode(features['concept'])
-            
-        return features
-
-    def freeze_vocabulary(self):
-        self.frozen = True

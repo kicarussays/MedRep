@@ -47,7 +47,7 @@ cr = cr[
 # mimic.columns = ["concept_id"]
 # If you have, add concept_ids from other institutions 
 all_concepts = []
-for hosp in ('mimic', 'ehrshot'):
+for hosp in ('mimic', 'ehrshot', 'snuh'):
     alltable = []
     for table in (
         'condition_occurrence', 'drug_exposure', 'measurement', 'procedure_occurrence'

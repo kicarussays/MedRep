@@ -47,21 +47,23 @@ class Encoder(torch.nn.Module):
 
 class Model(torch.nn.Module):
     def __init__(
-            self, 
+            self,
             config: dict):
         super(Model, self).__init__()
 
         self.encoder = Encoder(
-            in_channels=config['num_hidden'], 
-            out_channels=config['num_hidden'], 
+            in_channels=config['num_hidden'],
+            out_channels=config['num_hidden'],
             activation=({'relu': F.relu, 'prelu': nn.PReLU()})[config['activation']],
-            base_model=({'GCNConv': GCNConv})[config['base_model']], 
+            base_model=({'GCNConv': GCNConv})[config['base_model']],
             k=config['num_layers']
         )
         self.config = config
         self.tau = config['tau']
         self.fc1 = torch.nn.Linear(config['num_hidden'], config['num_proj_hidden'])
         self.fc2 = torch.nn.Linear(config['num_proj_hidden'], config['num_hidden'])
+        self.kldiv = nn.KLDivLoss(reduction='batchmean')
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor,
                 edge_index: torch.Tensor) -> torch.Tensor:
@@ -111,7 +113,7 @@ class Model(torch.nn.Module):
              mean: bool = True, batch_size: int = 0):
         h1 = self.projection(z1)
         h2 = self.projection(z2)
-
+        
         if batch_size == 0:
             l1 = self.semi_loss(h1, h2)
             l2 = self.semi_loss(h2, h1)
@@ -123,6 +125,11 @@ class Model(torch.nn.Module):
         ret = ret.mean() if mean else ret.sum()
 
         return ret
+
+    def kl_loss(self, x, edge_index):
+        z = self.forward(x, edge_index)
+        loss = self.kldiv(self.softmax(z).log(), self.softmax(x))
+        return loss
 
 
 def drop_feature(x, drop_prob):

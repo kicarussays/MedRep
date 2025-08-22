@@ -11,7 +11,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--num_cpus', type=int, default=96)
-parser.add_argument('--hospital', type=str, default='mimic')
+parser.add_argument('--hospital', type=str, default='snuh')
 parser.add_argument('--seq-length', type=int, default=2048)
 args = parser.parse_args()
 
@@ -56,6 +56,12 @@ test_id = pd.read_csv(os.path.join(spath, 'test_id.csv'))
 person = mpd.read_csv(os.path.join(dpath, 'person.csv'))
 visit = mpd.read_csv(os.path.join(dpath, 'visit_occurrence.csv'))
 visit.columns = [i.lower() for i in visit.columns]
+print('Done')
+
+concepts = mpd.read_csv(os.path.join(abspath, 'usedata/representation/concept_idx_full.csv'))
+concepts['concept_id'] = concepts['concept_id'].astype(str)
+allrecords['concept_id'] = allrecords['concept_id'].astype(str)
+allrecords = allrecords[allrecords['concept_id'].isin(concepts['concept_id'])]
 print('Done')
 
 
@@ -107,24 +113,6 @@ allrecords = allrecords[['person_id', 'concept_id', 'record_datetime', 'domain',
 print('Done')
 
 
-# Add gender info as tokens
-print('Add gender info...')
-person_for_merge = mpd.DataFrame(
-    person[['person_id', 'gender_concept_id']].values, 
-    columns=['person_id', 'concept_id']).reset_index(drop=True)
-person_for_merge['record_datetime'] = allrecords['record_datetime'].min() - datetime.timedelta(days=1)
-person_for_merge['domain'] = 'special_token'
-person_for_merge.columns = ['person_id', 'concept_id', 'record_datetime', 'domain']
-person_for_merge['concept_id'] = person_for_merge['concept_id'].astype(str)
-person_for_merge['age'] = np.nan
-allrecords['record_datetime'] = mpd.to_datetime(allrecords['record_datetime'])
-allrecords = mpd.concat([allrecords, person_for_merge]).sort_values(
-    ['person_id', 'record_datetime']).bfill().ffill() # fill age
-allrecords = allrecords[allrecords['concept_id'] != '0'] # Omit unmatched concepts
-allrecords.reset_index(drop=True, inplace=True)
-print('Done')
-
-
 # Assign visit and domain index
 print('Assign visit and domain index...')
 ar_visit = allrecords[allrecords['domain'] == 'visit'][['person_id', 'record_datetime']].sort_values(
@@ -133,10 +121,10 @@ ar_visit = allrecords[allrecords['domain'] == 'visit'][['person_id', 'record_dat
 ar_visit['record_date'] = mpd.to_datetime(ar_visit['record_datetime']).dt.date
 ar_visit['row'] = (ar_visit.groupby(['person_id', 'record_date']).cumcount()+1).iloc[:, 0] # modin.pandas bug
 ar_visit = ar_visit[ar_visit['row'] == 1].drop(columns=['row'])
-ar_visit['visit_rank'] = ar_visit.groupby(['person_id'])['record_date'].rank(method='dense')
+ar_visit['visit_rank'] = ar_visit.groupby('person_id')['record_date'].rank(method='dense')
 allrecords.loc[ar_visit.index, 'visit_rank'] = list(ar_visit['visit_rank'].astype(int))
 allrecords['visit_rank'] = allrecords.groupby(
-    ['person_id'])['visit_rank'].apply(lambda x: x.bfill().ffill()).values
+    'person_id')['visit_rank'].apply(lambda x: x.bfill().ffill()).values
 allrecords['visit_rank'] = allrecords['visit_rank'].fillna(1)
 
 domain_idx = ['special_token', 'cond', 'drug', 'meas', 'proc', 'visit']
@@ -157,6 +145,7 @@ allrecords['visit_rank'] = allrecords.groupby(
 allrecords['record_rank'] = allrecords.groupby(
     ['divided_person_id', 'visit_rank'])['record_datetime'].rank(method='dense')
 print('Saving...')
+allrecords['age'] = allrecords['age'].apply(lambda x: x if x >= 18 else 18)
 allrecords.to_csv(os.path.join(spath, 'allrecords_divided.csv'), index=None)
 print('Done')
 
@@ -165,7 +154,7 @@ print('Done')
 print('Save vocab...')
 vocab = allrecords['concept_id'].unique().astype(str)
 vocab = np.concatenate([
-    np.array(['[PAD]', '[MASK]', '[UNK]', '[CLS]', '[SEP]']), vocab])
+    np.array(['[PAD]', '[MASK]', '[UNK]', '[CLS]', '[SEP]', 'M', 'F']), vocab])
 vocab = {str(v): n for n, v in enumerate(vocab)}
 torch.save(vocab, os.path.join(spath, 'vocab.pt'))
 with open(os.path.join(spath, 'vocab.json'), 'w') as f:
