@@ -8,12 +8,14 @@ The official source code for MedRep. <br>
 
 - **April 24, 2025:** Full version of OMOP concept representations released.
 - **August 15, 2025:** Graph-free version of MedRep added.
+- **August 26, 2025:** DeBERTa weights pretrained with OMOP concept descriptions released.
 
   <br/>
 ## Downloads
 - **MedRep (full version, 22.1GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/h4j36yphpctluxdm4wo2m/concept_representation_medrep.npy?rlkey=a2awq87n4x7m7fy45hs7e2a3r&st=x1thytgc)
 - **MedRep (graph-free version, 22.1GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/i7h11v1707t5zbjj3ft4h/concept_representation_description.npy?rlkey=jrnpzp2cyqylprdkzggpchlz7&st=4n4rxsxn)  
 - **Concept index (65.0MB):** [Download](https://dl.dropboxusercontent.com/scl/fi/n0iao7c9ftwxhr6pwl7ab/concept_idx.csv?rlkey=qubzngglvmensaq2dp5gyja3j&st=9io2obza)
+- **DeBERTa weights (1.6GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/wqvdv283ms5yh038cpy0p/deberta_full.tar?rlkey=7xreaoyhmm5fm7gxsreps0pho&st=avqoz23j)
 
   <br/>
 ## Abstract
