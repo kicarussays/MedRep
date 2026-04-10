@@ -1,6 +1,9 @@
 # MedRep
 
-The official source code for MedRep. <br>
+The official source code for MedRep (Published in JAMIA). <br>
+Paper doi: https://doi.org/10.1093/jamia/ocag032 <br>
+Preprint doi: https://doi.org/10.48550/arXiv.2504.08329
+ 
 
   <br/>
 
