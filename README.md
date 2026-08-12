@@ -17,7 +17,9 @@ Preprint doi: https://doi.org/10.48550/arXiv.2504.08329
 ## Downloads
 - **MedRep (full version, 22.1GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/h4j36yphpctluxdm4wo2m/concept_representation_medrep.npy?rlkey=a2awq87n4x7m7fy45hs7e2a3r&st=x1thytgc)
 - **MedRep (graph-free version, 22.1GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/i7h11v1707t5zbjj3ft4h/concept_representation_description.npy?rlkey=jrnpzp2cyqylprdkzggpchlz7&st=4n4rxsxn)  
-- **Concept index (65.0MB):** [Download](https://dl.dropboxusercontent.com/scl/fi/n0iao7c9ftwxhr6pwl7ab/concept_idx.csv?rlkey=qubzngglvmensaq2dp5gyja3j&st=9io2obza)
+- **Concept index (65.0MB):** [Download](https://dl.dropboxusercontent.com/scl/fi/jon4epqu5wopfxycx9o4f/concept_idx.csv?rlkey=p7dv5e1ehe4y5nx5r2pkpx4d4&st=hu39k2bx)
+
+- https://www.dropbox.com/scl/fi/jon4epqu5wopfxycx9o4f/concept_idx.csv?rlkey=p7dv5e1ehe4y5nx5r2pkpx4d4&st=hu39k2bx&dl=0
 - **DeBERTa weights (1.6GB):** [Download](https://dl.dropboxusercontent.com/scl/fi/wqvdv283ms5yh038cpy0p/deberta_full.tar?rlkey=7xreaoyhmm5fm7gxsreps0pho&st=avqoz23j)
 
   <br/>
